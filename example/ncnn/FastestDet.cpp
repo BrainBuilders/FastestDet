@@ -1,5 +1,6 @@
 #include <math.h>
 #include <algorithm>
+#include <string>
 
 #include "net.h"
 #include "benchmark.h"
@@ -90,7 +91,7 @@ int nmsHandle(std::vector<TargetBox> &src_boxes, std::vector<TargetBox> &dst_box
     return 0;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     // 类别标签
     static const char* class_names[] = {
@@ -104,11 +105,19 @@ int main()
         "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear",
         "hair drier", "toothbrush"
     };
+
+    // Input image
+    if (argc <=1) {
+       fprintf(stderr, "USAGE: %s [IMAGE_PATH]\n", argv[0]);
+       return 1;
+    }
+    std::string image_path(argv[1]);
+
     // 类别数量
     int class_num = sizeof(class_names) / sizeof(class_names[0]);
 
     // 阈值
-    float thresh = 0.65;
+    float thresh = 0.75;
 
     // 模型输入宽高
     int input_width = 352;
@@ -117,13 +126,16 @@ int main()
     // 加载模型
     ncnn::Net net;
     net.load_param("FastestDet.param");
-    net.load_model("FastestDet.bin");  
-    printf("ncnn model load sucess...\n");
+    net.load_model("FastestDet.bin");
+    printf("ncnn model load success...\n");
 
     // 加载图片
-    cv::Mat img = cv::imread("3.jpg");
+    cv::Mat img = cv::imread(image_path);
     int img_width = img.cols;
     int img_height = img.rows;
+    printf("Loaded %s (%ix%i)\n", image_path.c_str(), img_width, img_height);
+
+    double start = ncnn::get_current_time();
 
     // resize of input image data
     ncnn::Mat input = ncnn::Mat::from_pixels_resize(img.data, ncnn::Mat::PIXEL_BGR,\
@@ -137,7 +149,6 @@ int main()
     ncnn::Extractor ex = net.create_extractor();
     ex.set_num_threads(1);
 
-    double start = ncnn::get_current_time();
     //set input tensor
     ex.input("input.1", input);
 
@@ -218,7 +229,9 @@ int main()
         cv::putText(img, class_names[box.category], cv::Point(box.x1, box.y1), cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(0, 255, 0), 2);
     }
     
-    cv::imwrite("result.jpg", img);
+    image_path += ".result.png";
+    cv::imwrite(image_path, img);
+    printf("Saved %s (%ix%i)\n", image_path.c_str(), img.cols, img.rows);
     
     return 0;
 }
