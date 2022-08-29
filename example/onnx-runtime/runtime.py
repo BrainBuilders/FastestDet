@@ -1,4 +1,5 @@
 import cv2
+import sys
 import time
 import numpy as np
 import onnxruntime 
@@ -114,7 +115,8 @@ def detection(session, img, input_width, input_height, thresh):
 
 if __name__ == '__main__':
     # 读取图片
-    img = cv2.imread("3.jpg")
+    img = cv2.imread(sys.argv[1])
+    img = img[:, 240:240+480]
     # 模型输入的宽高
     input_width, input_height = 352, 352
     # 加载模型

@@ -1,0 +1,18 @@
+DATASET:
+  TRAIN: "/tmp/ias/train.txt"
+  VAL: "/tmp/ias/val.txt"
+  NAMES: "/tmp/ias/category.names"
+MODEL:
+  NC: 4
+  INPUT_WIDTH: 352
+  INPUT_HEIGHT: 352
+TRAIN:
+  LR: 0.00025
+  THRESH: 0.25
+  WARMUP: true
+  BATCH_SIZE: 96
+  END_EPOCH: 300
+  MILESTIONES:
+    - 100
+    - 200
+    - 250

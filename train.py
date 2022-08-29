@@ -1,4 +1,5 @@
 import os
+import sys
 import math
 import torch
 import argparse
@@ -33,8 +34,21 @@ class FastestDet:
         # 初始化模型结构
         if opt.weight is not None:
             print("load weight from:%s"%opt.weight)
-            self.model = Detector(self.cfg.category_num, True).to(device)
-            self.model.load_state_dict(torch.load(opt.weight))
+            self.model = Detector(self.cfg.category_num, False).to(device)
+            model_dict = self.model.state_dict()
+            pretrained_dict = torch.load(opt.weight)
+
+            K = []
+            for k,v in pretrained_dict.items():
+                if len(v.shape) > 0 and v.shape[0] == 80:
+                    print(k, v.shape, model_dict[k].shape,)
+                    K.append(k)
+
+            W = {k: v for k, v in pretrained_dict.items() if k not in K}
+
+            model_dict.update(W)
+
+            self.model.load_state_dict(model_dict, strict=True)
         else:
             self.model = Detector(self.cfg.category_num, False).to(device)
 

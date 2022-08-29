@@ -1,9 +1,56 @@
 import os
 import cv2
 import numpy as np
+import sys
 
 import torch
 import random
+
+def flip_hor(image, boxes):
+    image = image[:, ::-1]
+    for box in boxes:
+        bx, by, bw, bh = box[2], box[3], box[4], box[5]
+        bx = 1 - bx
+        box[2] = bx
+    return image, boxes
+
+
+def flip_ver(image, boxes):
+    image = image[::-1, :]
+    for box in boxes:
+        bx, by, bw, bh = box[2], box[3], box[4], box[5]
+        by = 1 - by
+        box[3] = by
+    return image, boxes
+
+
+def rectify(image, boxes, aug):
+    height, width, _ = image.shape
+    assert width > height
+
+    if aug:
+        xs = random.randint(0, width - height)
+    else:
+        xs = (width - height) // 2
+    xe = xs + height
+
+    # create square image
+    img = image[:, xs:xe]
+
+    # recompute boxes
+    for box in boxes:
+        bx, by, bw, bh = box[2], box[3], box[4], box[5]
+        bx -= 0.5 * bw
+        bx *= width
+        bx -= xs
+        bx /= height
+        bw *= (width / height)
+        bx += 0.5 * bw
+        
+        box[2], box[4] = bx, bw
+
+    return img, boxes
+
 
 def random_crop(image, boxes):
     height, width, _ = image.shape
@@ -69,7 +116,7 @@ class TensorDataset():
         self.data_list = []
         self.img_width = img_width
         self.img_height = img_height
-        self.img_formats = ['bmp', 'jpg', 'jpeg', 'png']
+        self.img_formats = ['bmp', 'jpg', 'png']
 
         # 数据检查
         with open(self.path, 'r') as f:
@@ -82,11 +129,11 @@ class TensorDataset():
                     else:
                         self.data_list.append(data_path)
                 else:
-                    raise Exception("%s is not exist" % data_path)
+                    raise Exception("%s does not exist" % data_path)
 
     def __getitem__(self, index):
         img_path = self.data_list[index]
-        label_path = img_path.split(".")[0] + ".txt"
+        label_path = img_path[:-4] + ".txt"
 
         # 加载图片
         img = cv2.imread(img_path)
@@ -106,8 +153,16 @@ class TensorDataset():
         else:
             raise Exception("%s is not exist" % label_path) 
 
+
+        # convert original image of 848x480 to 480x480
+        img, label = rectify(img, label, self.aug)
+
         # 是否进行数据增强
         if self.aug:
+            if random.randint(0, 1) % 2 == 0:
+                img, label = flip_hor(img, label)
+            if random.randint(0, 1) % 2 == 0:
+                img, label = flip_ver(img, label)
             if random.randint(1, 10) % 2 == 0:
                 img, label = random_narrow(img, label)
             else:
@@ -116,12 +171,12 @@ class TensorDataset():
         img = cv2.resize(img, (self.img_width, self.img_height), interpolation = cv2.INTER_LINEAR) 
 
         # debug
-        # for box in label:
-        #     bx, by, bw, bh = box[2], box[3], box[4], box[5]
-        #     x1, y1 = int((bx - 0.5 * bw) * self.img_width), int((by - 0.5 * bh) * self.img_height)
-        #     x2, y2 = int((bx + 0.5 * bw) * self.img_width), int((by + 0.5 * bh) * self.img_height)
-        #     cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        # cv2.imwrite("debug.jpg", img)
+        #for box in label:
+        #    bx, by, bw, bh = box[2], box[3], box[4], box[5]
+        #    x1, y1 = int((bx - 0.5 * bw) * self.img_width), int((by - 0.5 * bh) * self.img_height)
+        #    x2, y2 = int((bx + 0.5 * bw) * self.img_width), int((by + 0.5 * bh) * self.img_height)
+        #    cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        #cv2.imwrite(f"debug-{index}.jpg", img)
 
         img = img.transpose(2,0,1)
         
@@ -131,7 +186,8 @@ class TensorDataset():
         return len(self.data_list)
 
 if __name__ == "__main__":
-    data = TensorDataset("/home/xuehao/Desktop/TMP/pytorch-yolo/widerface/train.txt")
-    img, label = data.__getitem__(0)
+    data = TensorDataset("/tmp/ias/train.txt", 352, 352, False)
+    for i in range(10):
+        img, label = data.__getitem__(i)
     print(img.shape)
     print(label.shape)
